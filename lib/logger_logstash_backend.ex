@@ -27,7 +27,8 @@ defmodule LoggerLogstashBackend do
     {:ok, :ok, configure(name, opts)}
   end
 
-  def handle_info(_, state) do
+  def handle_info(msg, state) do
+    IO.inspect(msg)
     {:ok, state}
   end
 
@@ -117,8 +118,11 @@ defmodule LoggerLogstashBackend do
   end
 
   defp send_log(%{protocol: :tcp, ssl: true, socket: socket} = state, json) do
+    IO.inspect("sending a log to logstash")
+
     case :ssl.send(socket, [json, "\n"]) do
       :ok ->
+        :ssl.recv(socket, 0) |> IO.inspect()
         state
 
       {:error, :closed} ->
@@ -130,6 +134,7 @@ defmodule LoggerLogstashBackend do
   defp send_log(%{protocol: :tcp, socket: socket} = state, json) do
     case :gen_tcp.send(socket, [json, "\n"]) do
       :ok ->
+        :gen_tcp.recv(socket, 0) |> IO.inspect()
         state
 
       {:error, :closed} ->
@@ -203,18 +208,18 @@ defmodule LoggerLogstashBackend do
   end
 
   defp open_socket(%{protocol: :tcp, ssl: true, socket: nil} = state) do
-    with {:ok, socket} <-
-           :gen_tcp.connect(state.host, state.port, [
-             {:active, true},
-             :binary,
-             {:keepalive, true},
-             {:send_timeout, 5000},
-             {:send_timeout_close, true}
-           ]),
-         {:ok, socket} <- :ssl.connect(socket, [fail_if_no_peer_cert: true], 5000) do
-      Map.merge(state, %{socket: socket, recorded_error: false})
-    else
-      {:error, reason} -> log_error(reason, state)
+    case :ssl.connect(
+           state.host,
+           state.port,
+           [{:send_timeout, 5000}, {:send_timeout_close, true}, {:keepalive, true}, :binary],
+           5000
+         ) do
+      {:ok, socket} ->
+        IO.inspect({:send_timeout, :ssl.getopts(socket, :send_timeout)})
+        Map.merge(state, %{socket: socket, recorded_error: false})
+
+      {:error, reason} ->
+        log_error(reason, state)
     end
   end
 

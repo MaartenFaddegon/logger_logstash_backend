@@ -122,7 +122,6 @@ defmodule LoggerLogstashBackend do
 
     case :ssl.send(socket, [json, "\n"]) do
       :ok ->
-        :ssl.recv(socket, 0) |> IO.inspect()
         state
 
       {:error, :closed} ->
@@ -134,7 +133,6 @@ defmodule LoggerLogstashBackend do
   defp send_log(%{protocol: :tcp, socket: socket} = state, json) do
     case :gen_tcp.send(socket, [json, "\n"]) do
       :ok ->
-        :gen_tcp.recv(socket, 0) |> IO.inspect()
         state
 
       {:error, :closed} ->
